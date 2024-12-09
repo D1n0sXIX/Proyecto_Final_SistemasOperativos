@@ -1,3 +1,10 @@
+/*
+  Proyecto Final de Sistemas Operativos
+  Hugo Olza
+  Alejandro Mamán
+  INSO 2B
+*/
+
 #define SIZE_BLOQUE 512
 #define MAX_INODOS 24
 #define MAX_FICHEROS 20
