@@ -112,11 +112,31 @@ void Printbytemaps(EXT_BYTE_MAPS *ext_bytemaps){/*Muestra el contenido del bytem
                                                 de bloques. Este comando te resultará muy útil durante el desarrollo.*/
 
 }
-int ComprobarComando(char *strcomando, char *orden, char *argumento1, char *argumento2){ // Comprueba que el comando existe
-
+int ComprobarComando(char *strcomando, char *orden, char *argumento1, char *argumento2){
+    int i;
+    sprintf(argumento1, "%s",""); //Inicializamos a vacío
+    sprintf(argumento2, "%s","");
+    sprintf(orden, "%s","");
+    sscanf(strcomando, "%s %s %s", orden,argumento1, argumento2);
+    for(i=0; orden[i]; i++){
+        orden[i] = tolower(orden[i]);
+    }
+    // printf("%s %s %s\n",orden,argumento1,argumento2);
+    if ((strcmp(orden,"dir")!=0) && (strcmp(orden,"rename")!=0) && (strcmp(orden,"copy")!=0)
+    && (strcmp(orden,"remove")!=0) && (strcmp(orden,"info")!=0) && (strcmp(orden,"imprimir")!=0)
+    && (strcmp(orden,"salir")!=0) && (strcmp(orden,"bytemaps")!=0)){
+        printf("ERROR: Comando ilegal [bytemaps,copy,dir,info,imprimir,rename,remove,sali]\n");
+        return -1;
+    }
 }
-void LeeSuperBloque(EXT_SIMPLE_SUPERBLOCK *psup){ // Introduciendo info -> muestra la información del superbloque por pantalla.
-
+void LeeSuperBloque(EXT_SIMPLE_SUPERBLOCK *psup)
+{
+    printf("Bloque %d Bytes\n", psup -> s_block_size);
+    printf("inodos particion = %d\n", psup -> s_inodes_count);
+    printf("inodos particion = %d\n", psup -> s_free_block_count);
+    printf("Bloques particion = %d\n", psup -> s_blocks_count);
+    printf("Bloques libres = %d\n", psup -> s_free_blocks_count);
+    printf("Primer bloque de datos = %d Bytes\n", psup -> s_first_data_block);
 }
 int BuscaFich(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, char *nombre){
 
