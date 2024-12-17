@@ -149,7 +149,15 @@ void LeeSuperBloque(EXT_SIMPLE_SUPERBLOCK *psup)
     printf("Primer bloque de datos = %d Bytes\n", psup -> s_first_data_block);
 }
 int BuscaFich(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, char *nombre){
-
+    int i;
+    for(i=0; i< MAX_FICHEROS; i++){
+        if (directorio[i].dir_inodo == NULL_INODO){
+            continue;
+        }
+        if (strcmp(directorio[i].nombre, nombre) == 0){
+            return i;
+        }
+    }
 }
 void Directorio(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos){
 
