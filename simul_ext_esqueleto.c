@@ -160,7 +160,13 @@ int BuscaFich(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, char *nombre)
     }
 }
 void Directorio(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos){
-
+    int i;
+    for(i=0; i< MAX_FICHEROS; i++){
+        if (strcmp(directorio[i].dir_nfich, ".") == 0) {
+        continue;
+        }
+        printf("Nombre: %s, Inodo: %d, Tamaño: %d bytes, Bloques: ", directorio[i].dir_nfich, directorio[i].dir_inodo, inodos->blq_inodos[directorio[i].dir_inodo].size_fichero);
+    }
 }
 int Renombrar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, char *nombreantiguo, char *nombrenuevo){
 
