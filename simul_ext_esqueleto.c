@@ -110,7 +110,17 @@ int main(){
 
 void Printbytemaps(EXT_BYTE_MAPS *ext_bytemaps){/*Muestra el contenido del bytemap de inodos y los 25 primeros elementos del bytemap
                                                 de bloques. Este comando te resultará muy útil durante el desarrollo.*/
-
+    int i;
+    printf("Inodos :");
+    for(i=0;i<MAX_INODOS;i++){
+        printf("%d", ext_bytemaps -> bmap_inodos[i]);
+    }
+    printf("\n");
+    printf("Bloques [0-25] :");
+    for(i=0;i<25;i++){
+        printf("%d", ext_bytemaps -> bmap_bloques[i]);
+    }
+    printf("\n");
 }
 int ComprobarComando(char *strcomando, char *orden, char *argumento1, char *argumento2){
     int i;
