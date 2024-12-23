@@ -36,13 +36,16 @@ void Grabarinodosydirectorio(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos
 void GrabarByteMaps(EXT_BYTE_MAPS *ext_bytemaps, FILE *fich);
 void GrabarSuperBloque(EXT_SIMPLE_SUPERBLOCK *ext_superblock, FILE *fich);
 void GrabarDatos(EXT_DATOS *memdatos, FILE *fich);
+int SelectorDeComando(const char *orden); // Funcion EXTRA, facilita la introduccion de una comando
+
 
 // Main
 int main(){
-	 char *comando[LONGITUD_COMANDO];
-	 char *orden[LONGITUD_COMANDO];
-	 char *argumento1[LONGITUD_COMANDO];
-	 char *argumento2[LONGITUD_COMANDO];
+    // IMPORTANTE MODIFICACCION: He quitado los * a estos arrays, me daba error a la hora de copilar
+	 char comando[LONGITUD_COMANDO];
+	 char orden[LONGITUD_COMANDO];
+	 char argumento1[LONGITUD_COMANDO];
+	 char argumento2[LONGITUD_COMANDO];
 	 
 	 int i,j;
 	 unsigned long int m;
@@ -59,14 +62,14 @@ int main(){
      // Lectura del fichero completo de una sola vez
      //...
      
-     fent = fopen("particion.bin","r+b"); // Leemos el ficheroq ue nos funciona de disco
+     fent = fopen("particion.bin","r+b"); // Leemos el fichero que usamos como disco
      fread(&datosfich, SIZE_BLOQUE, MAX_BLOQUES_PARTICION, fent);    
      
      /*copiamos bloques de memoria desde el arreglo datosfich hacia las estructuras correspondientes que representan diferentes
      partes de un sistema de archivos simulado.
      Cada línea tiene un proposito, relacionado con la organización y el contenido del archivo binario particion.bin.*/
      memcpy(&ext_superblock,(EXT_SIMPLE_SUPERBLOCK *)&datosfich[0], SIZE_BLOQUE);
-     memcpy(&directorio,(EXT_ENTRADA_DIR *)&datosfich[3], SIZE_BLOQUE);
+     memcpy(directorio, (EXT_ENTRADA_DIR *)&datosfich[3], sizeof(directorio));
      memcpy(&ext_bytemaps,(EXT_BLQ_INODOS *)&datosfich[1], SIZE_BLOQUE);
      memcpy(&ext_blq_inodos,(EXT_BLQ_INODOS *)&datosfich[2], SIZE_BLOQUE);
      memcpy(&memdatos,(EXT_DATOS *)&datosfich[4],MAX_BLOQUES_DATOS*SIZE_BLOQUE);
@@ -74,29 +77,58 @@ int main(){
      // Bucle de tratamiento de comandos -> Bucle principal
      for (;;){
 		 do {
-		 printf (">> "); // Prompt del usuario
+		 printf ("\n>> "); // Prompt del usuario
 		 fflush(stdin);
 		 fgets(comando, LONGITUD_COMANDO, stdin); // Aqui leemos el comando
+         comando[strcspn(comando, "\n")] = 0; // Eliminamos el salto de linea 
+
 		 }while (ComprobarComando(comando,orden,argumento1,argumento2) !=0);
 
-         // Debemos empezar por desarrollar la lectura de comandos
-         // Estos ifs son como un swich muy grande
-	     if (strcmp(orden,"dir")==0) {
-            Directorio(&directorio,&ext_blq_inodos);
-            continue;
-            }
-         //...
+        // Usamos un switch para manejar comandos // AÑADIDO AQUI
+         int input = SelectorDeComando(orden); // AÑADIDO AQUI
+
+         switch (input) { // AÑADIDO AQUI
+             case 0: // dir
+                 Directorio(directorio, &ext_blq_inodos);
+                 break;
+             case 1: // rename
+                 Renombrar(directorio, &ext_blq_inodos, argumento1, argumento2);
+                 break;
+             case 2: // copy
+                 Copiar(directorio, &ext_blq_inodos, &ext_bytemaps, &ext_superblock, memdatos, argumento1, argumento2, fent);
+                 break;
+             case 3: // remove
+                 Borrar(directorio, &ext_blq_inodos, &ext_bytemaps, &ext_superblock, argumento1, fent);
+                 break;
+             case 4: // info
+                 LeeSuperBloque(&ext_superblock);
+                 break;
+             case 5: // imprimir
+                 Imprimir(directorio, &ext_blq_inodos, memdatos, argumento1);
+                 break;
+             case 6: // bytemaps
+                 Printbytemaps(&ext_bytemaps);
+                 break;
+             case 7: // salir
+                 GrabarDatos(memdatos, fent);
+                 fclose(fent);
+                 return 0;
+             default: // Comando desconocido
+                 printf("ERROR, Este comando no es valido\n");
+                 break;
+         }
+
          // Escritura de metadatos en comandos rename, remove, copy     
-         Grabarinodosydirectorio(&directorio,&ext_blq_inodos,fent);
+         Grabarinodosydirectorio(directorio,&ext_blq_inodos,fent);
          GrabarByteMaps(&ext_bytemaps,fent);
          GrabarSuperBloque(&ext_superblock,fent);
          if (grabardatos)
-           GrabarDatos(&memdatos,fent);
+           GrabarDatos(memdatos,fent);
          grabardatos = 0;
          //Si el comando es salir se habrán escrito todos los metadatos
          //faltan los datos y cerrar
          if (strcmp(orden,"salir")==0){
-            GrabarDatos(&memdatos,fent);
+            GrabarDatos(memdatos,fent);
             fclose(fent);
             return 0;
          }
@@ -107,6 +139,21 @@ int main(){
 // ESTO ES LO PRIMERO CON LO QUE NOS TENEMOS QUE PONER!!!
 //Definicion de funciones:
 
+// Funcion que convierte un comando en un indice comprobando si es correcto
+int SelectorDeComando(const char *orden) {
+    // Creamos una lista de comandos
+    const char *comandos[8] = {"dir", "rename", "copy", "remove", "info", "imprimir", "bytemaps", "salir"};
+    // Y vamos comparandolos del 1 al 8
+    for (int i = 0; i < 8; i++) {
+        // Si la orden introducida coincide con el comando se devuleve esa posicion del comando
+        // La cual es la que determina el tipo de orden orden
+        if (strcmp(orden, comandos[i]) == 0) {
+            return i;
+        }
+    }
+    // Si no se encuentra devolvemos -1, como comando no reconocido
+    return -1;
+}
 
 void Printbytemaps(EXT_BYTE_MAPS *ext_bytemaps){/*Muestra el contenido del bytemap de inodos y los 25 primeros elementos del bytemap
                                                 de bloques. Este comando te resultará muy útil durante el desarrollo.*/
@@ -150,21 +197,25 @@ void LeeSuperBloque(EXT_SIMPLE_SUPERBLOCK *psup)
 }
 int BuscaFich(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, char *nombre){
     int i;
-    for(i=0; i< MAX_FICHEROS; i++){
-        if (directorio[i].dir_inodo == NULL_INODO){
+    for (i = 0; i < MAX_FICHEROS; i++) {
+        if (directorio[i].dir_inodo == NULL_INODO) {
             continue;
         }
-        if (strcmp(directorio[i].nombre, nombre) == 0){
+        // Cambiamos "nombre" por "dir_nfich"
+        if (strcmp(directorio[i].dir_nfich, nombre) == 0) {
             return i;
         }
     }
+    return -1;
 }
+
 void Directorio(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos){
     int i;
     for(i=0; i< MAX_FICHEROS; i++){
         if (strcmp(directorio[i].dir_nfich, ".") == 0) {
         continue;
         }
+        // MOstramos informaccion del directorio en cuestion
         printf("Nombre: %s, Inodo: %d, Tamaño: %d bytes, Bloques: ", directorio[i].dir_nfich, directorio[i].dir_inodo, inodos->blq_inodos[directorio[i].dir_inodo].size_fichero);
     }
 }
