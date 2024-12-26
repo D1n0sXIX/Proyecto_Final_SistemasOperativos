@@ -242,9 +242,36 @@ void Directorio(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos){
     }
 }
 
-int Renombrar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, char *nombreantiguo, char *nombrenuevo){
+int Renombrar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, char *nombreantiguo, char *nombrenuevo) {
+    // Verificar si el nombre nuevo ya existe
+    for (int i = 0; i < MAX_FICHEROS; i++) {
+        if (directorio[i].dir_inodo != NULL_INODO && strcmp(directorio[i].dir_nfich, nombrenuevo) == 0) {
+            printf("ERROR: Ya existe un archivo con el nombre '%s'.\n", nombrenuevo);
+            return -1;
+        }
+    }
 
+    // Buscar el archivo con el nombre antiguo
+    int index = BuscaFich(directorio, inodos, nombreantiguo);
+    if (index == -1) {
+        printf("ERROR: Archivo '%s' no encontrado.\n", nombreantiguo);
+        return -1;
+    }
+
+    // Validar longitud del nuevo nombre
+    if (strlen(nombrenuevo) >= LEN_NFICH) {
+        printf("ERROR: El nombre '%s' es demasiado largo (máximo %d caracteres).\n", nombrenuevo, LEN_NFICH - 1);
+        return -1;
+    }
+
+    // Renombrar el archivo
+    strncpy(directorio[index].dir_nfich, nombrenuevo, LEN_NFICH - 1);
+    directorio[index].dir_nfich[LEN_NFICH - 1] = '\0'; // Asegurar terminación de cadena
+    printf("Archivo '%s' renombrado a '%s'.\n", nombreantiguo, nombrenuevo);
+
+    return 0; // Éxito
 }
+
 int Imprimir(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_DATOS *memdatos, char *nombre) {
     // Buscar el archivo en el directorio
     int nombreFichero = BuscaFich(directorio, inodos, nombre);
