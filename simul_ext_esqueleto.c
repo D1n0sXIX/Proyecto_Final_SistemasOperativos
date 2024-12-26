@@ -109,11 +109,22 @@ int main(){
              case 6: // bytemaps
                  Printbytemaps(&ext_bytemaps);
                  break;
-             case 7: // salir
+             case 7: // exit
                  GrabarDatos(memdatos, fent);
                  fclose(fent);
                  return 0;
-             default: // Comando desconocido
+
+            case 8: // help
+                printf("Lista de comandos:");
+                printf("\n- dir: Lista todos los ficheros");
+                printf("\n- rename: Cambia el nombre de un fichero en la entrada correspondiente");
+                printf("\n- copy: Permite copiar un fichero");
+                printf("\n- remove: Permite eliminar un fichero");
+                printf("\n- info: Muestra informaccion del Superbloque");
+                printf("\n- imprimir: Muestra el contenido de un fichero");
+                printf("\n- exit: Sales del programa");
+                break;
+             default: // Por si se introduce un comando no valido
                  printf("ERROR, Este comando no es valido\n");
                  break;
          }
@@ -142,9 +153,9 @@ int main(){
 // Funcion que convierte un comando en un indice comprobando si es correcto
 int SelectorDeComando(const char *orden) {
     // Creamos una lista de comandos
-    const char *comandos[8] = {"dir", "rename", "copy", "remove", "info", "imprimir", "bytemaps", "salir"};
+    const char *comandos[9] = {"dir", "rename", "copy", "remove", "info", "imprimir", "bytemaps", "exit", "help"};
     // Y vamos comparandolos del 1 al 8
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 9; i++) {
         // Si la orden introducida coincide con el comando se devuleve esa posicion del comando
         // La cual es la que determina el tipo de orden orden
         if (strcmp(orden, comandos[i]) == 0) {
@@ -169,62 +180,119 @@ void Printbytemaps(EXT_BYTE_MAPS *ext_bytemaps){/*Muestra el contenido del bytem
     }
     printf("\n");
 }
-int ComprobarComando(char *strcomando, char *orden, char *argumento1, char *argumento2){
-    int i;
-    sprintf(argumento1, "%s",""); //Inicializamos a vacío
-    sprintf(argumento2, "%s","");
-    sprintf(orden, "%s","");
-    sscanf(strcomando, "%s %s %s", orden,argumento1, argumento2);
-    for(i=0; orden[i]; i++){
+int ComprobarComando(char *strcomando, char *orden, char *argumento1, char *argumento2) {
+    /* Debemos de inicializar los argumentos como cadenas vacias, esto es para poder tomar varios argumentos por separado
+    ya que si solo tomamos 1 a la hora de ejecutar comandos como info, remove o copy, no seran comandos validos*/
+    sprintf(argumento1, "%s", "");
+    sprintf(argumento2, "%s", "");
+    sprintf(orden, "%s", "");
+
+    // Dividimos la entrada en orden y argumentos
+    sscanf(strcomando, "%s %s %s", orden, argumento1, argumento2);
+
+    // Convertimos el comando principal a minúsculas para validarlo
+    for (int i = 0; orden[i]; i++) {
         orden[i] = tolower(orden[i]);
     }
-    // printf("%s %s %s\n",orden,argumento1,argumento2);
-    if ((strcmp(orden,"dir")!=0) && (strcmp(orden,"rename")!=0) && (strcmp(orden,"copy")!=0)
-    && (strcmp(orden,"remove")!=0) && (strcmp(orden,"info")!=0) && (strcmp(orden,"imprimir")!=0)
-    && (strcmp(orden,"salir")!=0) && (strcmp(orden,"bytemaps")!=0)){
-        printf("ERROR: Comando ilegal [bytemaps,copy,dir,info,imprimir,rename,remove,sali]\n");
-        return -1;
+
+    // Verificamos si el comando principal es valido
+    const char *comandos_validos[9] = {"dir", "rename", "copy", "remove", "info", "imprimir", "bytemaps", "exit", "help"};
+    for (int i = 0; i < 9; i++) {
+        if (strcmp(orden, comandos_validos[i]) == 0) {
+            return 0;
+        }
     }
+    printf("ERROR\n");
+    return -1;
 }
-void LeeSuperBloque(EXT_SIMPLE_SUPERBLOCK *psup)
-{
-    printf("Bloque %d Bytes\n", psup -> s_block_size);
-    printf("inodos particion = %d\n", psup -> s_inodes_count);
-    printf("inodos particion = %d\n", psup -> s_free_blocks_count);
-    printf("Bloques particion = %d\n", psup -> s_blocks_count);
-    printf("Bloques libres = %d\n", psup -> s_free_blocks_count);
-    printf("Primer bloque de datos = %d Bytes\n", psup -> s_first_data_block);
+
+void LeeSuperBloque(EXT_SIMPLE_SUPERBLOCK *psup){
+    printf("\nInformaccion del SuperBloque:");
+    printf("\n- Tamaño del Super Bloque = %d Bytes", psup -> s_block_size);
+    printf("\n- Numero de Total de inodos = %d", psup -> s_inodes_count);
+    printf("\n- Numero de inodos Libres = %d", psup -> s_free_blocks_count);
+    printf("\n- Numero Total de Bloques = %d", psup -> s_blocks_count);
+    printf("\n- Numero de Bloques Libres = %d", psup -> s_free_blocks_count);
+    printf("\n- Primer bloque de Datos = %d Bytes", psup -> s_first_data_block);
 }
+
 int BuscaFich(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, char *nombre){
     int i;
     for (i = 0; i < MAX_FICHEROS; i++) {
         if (directorio[i].dir_inodo == NULL_INODO) {
             continue;
         }
-        // Cambiamos "nombre" por "dir_nfich"
         if (strcmp(directorio[i].dir_nfich, nombre) == 0) {
             return i;
         }
     }
+    printf("\nEl archivo %s no encontrado", nombre);
     return -1;
 }
 
 void Directorio(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos){
     int i;
     for(i=0; i< MAX_FICHEROS; i++){
-        if (strcmp(directorio[i].dir_nfich, ".") == 0) {
-        continue;
+        // Añadimos una condifccion que nos permita evitar entradas vacias y la entrada raiz
+        if (directorio[i].dir_inodo == NULL_INODO || strcmp(directorio[i].dir_nfich, ".") == 0) {
+            continue;
         }
         // MOstramos informaccion del directorio en cuestion
-        printf("Nombre: %s, Inodo: %d, Tamaño: %d bytes, Bloques: ", directorio[i].dir_nfich, directorio[i].dir_inodo, inodos->blq_inodos[directorio[i].dir_inodo].size_fichero);
+        printf("\nNombre: %s    Inodo: %d    Tamaño: %d Bloques:", directorio[i].dir_nfich, directorio[i].dir_inodo, inodos->blq_inodos[directorio[i].dir_inodo].size_fichero);
     }
 }
+
 int Renombrar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, char *nombreantiguo, char *nombrenuevo){
 
 }
-int Imprimir(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_DATOS *memdatos, char *nombre){
-   
+int Imprimir(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_DATOS *memdatos, char *nombre) {
+    // Buscar el archivo en el directorio
+    int nombreFichero = BuscaFich(directorio, inodos, nombre);
+    unsigned short int inodoNum = directorio[nombreFichero].dir_inodo;
+    EXT_SIMPLE_INODE *inodo = &inodos->blq_inodos[inodoNum];
+
+    // Comprobacciones
+    
+    if (nombreFichero == -1) {
+        return -1; // Error ya manejado en BuscaFich
+    }
+
+    // Obtener el inodo correspondiente
+    if (inodoNum >= MAX_INODOS) {
+        printf("ERROR: Inodo fuera de rango para el archivo '%s'.\n", nombre);
+        return -1;
+    }
+
+
+    // Verificar si el archivo tiene contenido
+    if (inodo->size_fichero == 0) {
+        printf("El archivo '%s' esta vacio.\n", nombre);
+        return 0;
+    }
+
+    // Mostrar contenido del archivo
+    printf("Contenido del archivo '%s':\n", nombre);
+    for (int i = 0; i < MAX_NUMS_BLOQUE_INODO; i++) {
+        unsigned short int bloque_num = inodo->i_nbloque[i];
+        if (bloque_num == NULL_BLOQUE) {
+            break; // Fin de bloques asignados
+        }
+
+        // Validar el rango del bloque
+        if (bloque_num >= MAX_BLOQUES_DATOS) {
+            printf("ERROR: Bloque %d fuera de rango.\n", bloque_num);
+            break;
+        }
+
+        // Mostrar el contenido del bloque
+        fwrite(memdatos[bloque_num].dato, 1, SIZE_BLOQUE, stdout);
+    }
+    printf("\n");
+
+    return 0;
 }
+
+
 int Borrar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos,
            EXT_BYTE_MAPS *ext_bytemaps, EXT_SIMPLE_SUPERBLOCK *ext_superblock,
            char *nombre,  FILE *fich){
