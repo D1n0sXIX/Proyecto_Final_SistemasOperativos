@@ -37,6 +37,7 @@ void GrabarByteMaps(EXT_BYTE_MAPS *ext_bytemaps, FILE *fich);
 void GrabarSuperBloque(EXT_SIMPLE_SUPERBLOCK *ext_superblock, FILE *fich);
 void GrabarDatos(EXT_DATOS *memdatos, FILE *fich);
 int SelectorDeComando(const char *orden); // Funcion EXTRA, facilita la introduccion de una comando
+int CalcularBloquesAsignados(EXT_SIMPLE_INODE *inodo); // Funcion EXTRA, facilita el calculo de bloques asigandos a cada fichero
 
 
 // Main
@@ -202,9 +203,23 @@ int ComprobarComando(char *strcomando, char *orden, char *argumento1, char *argu
             return 0;
         }
     }
-    printf("ERROR\n");
+    printf("ERROR, comando no valido\n");
     return -1;
 }
+
+int CalcularBloquesAsignados(EXT_SIMPLE_INODE *inodo) {
+    int bloquesAsignados = 0;
+
+    for (int i = 0; i < MAX_NUMS_BLOQUE_INODO; i++) {
+        if (inodo->i_nbloque[i] == NULL_BLOQUE) {
+            break; // Fin de bloques asignados
+        }
+        bloquesAsignados++;
+    }
+
+    return bloquesAsignados;
+}
+
 
 void LeeSuperBloque(EXT_SIMPLE_SUPERBLOCK *psup){
     printf("\nInformaccion del SuperBloque:");
@@ -230,16 +245,37 @@ int BuscaFich(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, char *nombre)
     return -1;
 }
 
-void Directorio(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos){
-    int i;
-    for(i=0; i< MAX_FICHEROS; i++){
-        // Añadimos una condifccion que nos permita evitar entradas vacias y la entrada raiz
+void Directorio(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos) {
+    printf("\n--- Listado de archivos ---\n");
+    for (int i = 0; i < MAX_FICHEROS; i++) {
+        // Ignorar entradas vacías y la entrada raíz
         if (directorio[i].dir_inodo == NULL_INODO || strcmp(directorio[i].dir_nfich, ".") == 0) {
             continue;
         }
-        // MOstramos informaccion del directorio en cuestion
-        printf("\nNombre: %s    Inodo: %d    Tamaño: %d Bloques:", directorio[i].dir_nfich, directorio[i].dir_inodo, inodos->blq_inodos[directorio[i].dir_inodo].size_fichero);
+
+        unsigned short int inodoNum = directorio[i].dir_inodo;
+        if (inodoNum >= MAX_INODOS) {
+            printf("ERROR: Inodo fuera de rango en la entrada %d.\n", i);
+            continue;
+        }
+
+        EXT_SIMPLE_INODE *inodo = &inodos->blq_inodos[inodoNum];
+
+        // Mostrar los bloques ocupados
+        printf("Nombre: %s    Inodo: %d    Tamaño: %d bytes    Bloques: ",
+               directorio[i].dir_nfich,
+               inodoNum,
+               inodo->size_fichero);
+        for (int j = 0; j < MAX_NUMS_BLOQUE_INODO; j++) {
+            if (inodo->i_nbloque[j] == NULL_BLOQUE) {
+                break; // Fin de bloques asignados
+            }
+            printf("%d ", inodo->i_nbloque[j]);
+        }
+        printf("\n");
+
     }
+    printf("---------------------------\n");
 }
 
 int Renombrar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, char *nombreantiguo, char *nombrenuevo) {
@@ -269,55 +305,60 @@ int Renombrar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, char *nombrea
     directorio[index].dir_nfich[LEN_NFICH - 1] = '\0'; // Asegurar terminación de cadena
     printf("Archivo '%s' renombrado a '%s'.\n", nombreantiguo, nombrenuevo);
 
-    return 0; // Éxito
+    return 0;
 }
-
 int Imprimir(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_DATOS *memdatos, char *nombre) {
     // Buscar el archivo en el directorio
     int nombreFichero = BuscaFich(directorio, inodos, nombre);
-    unsigned short int inodoNum = directorio[nombreFichero].dir_inodo;
-    EXT_SIMPLE_INODE *inodo = &inodos->blq_inodos[inodoNum];
-
-    // Comprobacciones
-    
     if (nombreFichero == -1) {
-        return -1; // Error ya manejado en BuscaFich
+        printf("ERROR: Archivo '%s' no encontrado.\n", nombre);
+        return -1;
     }
 
     // Obtener el inodo correspondiente
+    unsigned short int inodoNum = directorio[nombreFichero].dir_inodo;
     if (inodoNum >= MAX_INODOS) {
         printf("ERROR: Inodo fuera de rango para el archivo '%s'.\n", nombre);
         return -1;
     }
 
+    EXT_SIMPLE_INODE *inodo = &inodos->blq_inodos[inodoNum];
 
     // Verificar si el archivo tiene contenido
     if (inodo->size_fichero == 0) {
-        printf("El archivo '%s' esta vacio.\n", nombre);
+        printf("El archivo '%s' está vacío.\n", nombre);
         return 0;
     }
 
-    // Mostrar contenido del archivo
+    // Calcular bloques asignados y mostrar contenido
     printf("Contenido del archivo '%s':\n", nombre);
+
     for (int i = 0; i < MAX_NUMS_BLOQUE_INODO; i++) {
         unsigned short int bloque_num = inodo->i_nbloque[i];
+        
+        // Validar bloque
         if (bloque_num == NULL_BLOQUE) {
             break; // Fin de bloques asignados
         }
-
-        // Validar el rango del bloque
         if (bloque_num >= MAX_BLOQUES_DATOS) {
-            printf("ERROR: Bloque %d fuera de rango.\n", bloque_num);
+            printf("\nERROR: Bloque %d fuera de rango.\n", bloque_num);
             break;
         }
 
-        // Mostrar el contenido del bloque
-        fwrite(memdatos[bloque_num].dato, 1, SIZE_BLOQUE, stdout);
-    }
-    printf("\n");
+        // Calcular cuántos bytes imprimir del bloque actual
+        int bytesRestantes = inodo->size_fichero - i * SIZE_BLOQUE;
+        int bytesImprimir = (bytesRestantes > SIZE_BLOQUE) ? SIZE_BLOQUE : bytesRestantes;
 
+        // Imprimir contenido del bloque
+        fwrite(memdatos[bloque_num].dato, 1, bytesImprimir, stdout);
+    }
+
+    printf("\n");
     return 0;
 }
+
+
+
 
 
 int Borrar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos,
