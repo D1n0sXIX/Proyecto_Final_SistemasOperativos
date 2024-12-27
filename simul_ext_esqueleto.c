@@ -371,16 +371,35 @@ int Copiar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos,
            EXT_DATOS *memdatos, char *nombreorigen, char *nombredestino,  FILE *fich){
 
 }
-void Grabarinodosydirectorio(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, FILE *fich){
+void Grabarinodosydirectorio(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, FILE *fich) {
+    // Escribir los inodos en el archivo
+    fseek(fich, SIZE_BLOQUE * 2, SEEK_SET); // El bloque 2 contiene la lista de inodos
+    fwrite(inodos, sizeof(EXT_BLQ_INODOS), 1, fich);
 
+    // Escribir el directorio en el archivo
+    fseek(fich, SIZE_BLOQUE * 3, SEEK_SET); // El bloque 3 contiene el directorio
+    fwrite(directorio, sizeof(EXT_ENTRADA_DIR) * MAX_FICHEROS, 1, fich);
+
+    printf("Inodos y directorio grabados correctamente.\n");
 }
-void GrabarByteMaps(EXT_BYTE_MAPS *ext_bytemaps, FILE *fich){
+void GrabarByteMaps(EXT_BYTE_MAPS *ext_bytemaps, FILE *fich) {
+    // Escribir los bytemaps en el bloque 1
+    fseek(fich, SIZE_BLOQUE * 1, SEEK_SET); // El bloque 1 contiene los bytemaps
+    fwrite(ext_bytemaps, sizeof(EXT_BYTE_MAPS), 1, fich);
 
+    printf("ByteMaps grabados correctamente.\n");
 }
-void GrabarSuperBloque(EXT_SIMPLE_SUPERBLOCK *ext_superblock, FILE *fich){
+void GrabarSuperBloque(EXT_SIMPLE_SUPERBLOCK *ext_superblock, FILE *fich) {
+    // Escribir el superbloque en el bloque 0
+    fseek(fich, 0, SEEK_SET); // El bloque 0 contiene el superbloque
+    fwrite(ext_superblock, sizeof(EXT_SIMPLE_SUPERBLOCK), 1, fich);
 
+    printf("SuperBloque grabado correctamente.\n");
 }
-void GrabarDatos(EXT_DATOS *memdatos, FILE *fich){
+void GrabarDatos(EXT_DATOS *memdatos, FILE *fich) {
+    // Escribir los datos a partir del bloque 4
+    fseek(fich, SIZE_BLOQUE * PRIM_BLOQUE_DATOS, SEEK_SET); // Los bloques de datos empiezan en el bloque 4
+    fwrite(memdatos, sizeof(EXT_DATOS), MAX_BLOQUES_DATOS, fich);
 
+    printf("Datos grabados correctamente.\n");
 }
-
