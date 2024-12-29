@@ -23,34 +23,28 @@ int BuscaFich(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, char *nombre)
 void Directorio(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos);
 int Renombrar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, char *nombreantiguo, char *nombrenuevo);
 int Imprimir(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_DATOS *memdatos, char *nombre);
-int Borrar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_BYTE_MAPS *ext_bytemaps,
-           EXT_SIMPLE_SUPERBLOCK *ext_superblock, char *nombre, FILE *fich);
-int Copiar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_BYTE_MAPS *ext_bytemaps,
-           EXT_SIMPLE_SUPERBLOCK *ext_superblock, EXT_DATOS *memdatos, char *nombreorigen, char *nombredestino, FILE *fich);
+int Borrar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_BYTE_MAPS *ext_bytemaps, EXT_SIMPLE_SUPERBLOCK *ext_superblock, char *nombre, EXT_DATOS *memdatos); // añadido un parametro --> memdatos
+int Copiar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_BYTE_MAPS *ext_bytemaps, EXT_SIMPLE_SUPERBLOCK *ext_superblock, EXT_DATOS *memdatos, char *nombreorigen, char *nombredestino, FILE *fich);
 void Grabarinodosydirectorio(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, FILE *fich);
 void GrabarByteMaps(EXT_BYTE_MAPS *ext_bytemaps, FILE *fich);
 void GrabarSuperBloque(EXT_SIMPLE_SUPERBLOCK *ext_superblock, FILE *fich);
 void GrabarDatos(EXT_DATOS *memdatos, FILE *fich);
 int SelectorDeComando(const char *orden);  // Funcion EXTRA, facilita la introduccion de una comando
-int CalcularBloquesAsignados(EXT_SIMPLE_INODE *inodo); // Funcion EXTRA, facilita el calculo de bloques asigandos a cada fichero
-
+void printMemDatos(EXT_DATOS *memdatos); // Funcion EXTRA, ayuda para comprobar que se ha eliminaod el contenido de los bloques
 
 // Main
 int main(){
-	 char comando[LONGITUD_COMANDO];
-	 char orden[LONGITUD_COMANDO];
-	 char argumento1[LONGITUD_COMANDO];
-	 char argumento2[LONGITUD_COMANDO];
+	 char comando[LONGITUD_COMANDO]; // Array que almacenara el comando introducido
+	 char orden[LONGITUD_COMANDO]; // Array que determinara  los tipos de ordenes que son accesibles
+	 char argumento1[LONGITUD_COMANDO]; // Array que almacena el primer argumento de una orden
+	 char argumento2[LONGITUD_COMANDO]; // Array que lamacena el segundo argumento de una orden
 	 
-	 int i,j;
-	 unsigned long int m;
      EXT_SIMPLE_SUPERBLOCK ext_superblock;
      EXT_BYTE_MAPS ext_bytemaps;
      EXT_BLQ_INODOS ext_blq_inodos;
      EXT_ENTRADA_DIR directorio[MAX_FICHEROS];
      EXT_DATOS memdatos[MAX_BLOQUES_DATOS];
      EXT_DATOS datosfich[MAX_BLOQUES_PARTICION];
-     int entradadir;
      int grabardatos = 0;
      FILE *fent;
      
@@ -59,8 +53,8 @@ int main(){
      fread(&datosfich, SIZE_BLOQUE, MAX_BLOQUES_PARTICION, fent);    
      
      /*Copiamos bloques de memoria desde el arreglo datosfich hacia las estructuras correspondientes que representan diferentes
-     partes de un sistema de archivos simulado.
-     Cada línea tiene un proposito, relacionado con la organización y el contenido del archivo binario particion.bin.*/
+     partes de un sistema de archivos simulado
+     Cada línea tiene un proposito, relacionado con la organización y el contenido del archivo binario 'particion.bin'*/
      memcpy(&ext_superblock,(EXT_SIMPLE_SUPERBLOCK *)&datosfich[0], SIZE_BLOQUE);
      memcpy(directorio, (EXT_ENTRADA_DIR *)&datosfich[3], sizeof(directorio));
      memcpy(&ext_bytemaps,(EXT_BLQ_INODOS *)&datosfich[1], SIZE_BLOQUE);
@@ -77,8 +71,8 @@ int main(){
 
 		 }while (ComprobarComando(comando,orden,argumento1,argumento2) !=0);
 
-        // Usamos un switch para manejar comandos // AÑADIDO AQUI
-         int input = SelectorDeComando(orden); // AÑADIDO AQUI
+        // Usamos un switch para manejar comandos
+         int input = SelectorDeComando(orden);
 
          switch (input) { // AÑADIDO AQUI
              case 0: // dir
@@ -86,16 +80,16 @@ int main(){
                  break;
              case 1: // rename
                  Renombrar(directorio, &ext_blq_inodos, argumento1, argumento2);
-                 //grabardatos = 1;
+                 grabardatos = 1;
                  break;
              case 2: // copy
                  Copiar(directorio, &ext_blq_inodos, &ext_bytemaps, &ext_superblock, memdatos, argumento1, argumento2, fent);
-                 //grabardatos = 1;
+                 grabardatos = 1;
 
                  break;
              case 3: // remove
-                 Borrar(directorio, &ext_blq_inodos, &ext_bytemaps, &ext_superblock, argumento1, fent);
-                 //grabardatos = 1;
+                 Borrar(directorio, &ext_blq_inodos, &ext_bytemaps, &ext_superblock, argumento1, memdatos);
+                 grabardatos = 1;
 
                  break;
              case 4: // info
@@ -111,6 +105,9 @@ int main(){
                  fclose(fent);
                  return 0;
 
+            case 9: // debugger
+                printMemDatos(memdatos);
+                break;
             case 8: // help
                 printf("Lista de comandos:");
                 printf("\n- dir: Lista todos los ficheros");
@@ -120,14 +117,15 @@ int main(){
                 printf("\n- info: Muestra informaccion del Superbloque");
                 printf("\n- imprimir: Muestra el contenido de un fichero");
                 printf("\n- bytemaps: Muestra el contenido del bytemap de inodos y los 25 primeros elementos del bytemap de bloques");
+                printf("\n- debugger: Muestra el contenido de todos los bloques para ver si realmente se han eliminado los datos");
                 printf("\n- exit: Sales del programa");
                 break;
              default: // Por si se introduce un comando no valido
-                 printf("ERROR, Este comando no es valido\n");
+                 printf("ERROR --> comando no valido\nUsa 'help' para más informacion");
                  break;
          }
 
-        // Como sol modificamos la variable grabarDatos con  rename, copy y remove, si esta ha sido modificada, grabamos los datos
+        // Como solo modificamos la variable grabarDatos con  rename, copy y remove, si esta ha sido modificada --> grabamos los datos
         if (grabardatos) {
             Grabarinodosydirectorio(directorio, &ext_blq_inodos, fent);
             GrabarByteMaps(&ext_bytemaps, fent);
@@ -135,18 +133,16 @@ int main(){
             GrabarDatos(memdatos, fent);
             grabardatos = 0; // Reiniciamos la condicion
         }
-
-         
      }
 }
 
 //Definicion de funciones:
-// Funcion que convierte un comando en un indice comprobando si es correcto
+// Funcion que comprueba si el input introducido por el usuario es correcto
 int SelectorDeComando(const char *orden) {
     // Creamos una lista de comandos
-    const char *comandos[9] = {"dir", "rename", "copy", "remove", "info", "imprimir", "bytemaps", "exit", "help"};
+    const char *comandos[10] = {"dir", "rename", "copy", "remove", "info", "imprimir", "bytemaps", "exit", "help", "debugger"};
     // Y vamos comparandolos del 1 al 8
-    for (int i = 0; i < 9; i++) {
+    for (int i = 0; i < 10; i++) {
         // Si la orden introducida coincide con el comando se devuleve esa posicion del comando
         // La cual es la que determina el tipo de orden orden
         if (strcmp(orden, comandos[i]) == 0) {
@@ -158,7 +154,7 @@ int SelectorDeComando(const char *orden) {
 }
 
 void Printbytemaps(EXT_BYTE_MAPS *ext_bytemaps){/*Muestra el contenido del bytemap de inodos y los 25 primeros elementos del bytemap
-                                                de bloques. Este comando te resultará muy útil durante el desarrollo.*/
+                                                de bloques*/
     int i;
     printf("Inodos :");
     for(i=0;i<MAX_INODOS;i++){
@@ -171,6 +167,8 @@ void Printbytemaps(EXT_BYTE_MAPS *ext_bytemaps){/*Muestra el contenido del bytem
     }
     printf("\n");
 }
+
+// Funcionq ue comprueba que el comando es valido dividiendo en argumentos el input
 int ComprobarComando(char *strcomando, char *orden, char *argumento1, char *argumento2) {
     /* Debemos de inicializar los argumentos como cadenas vacias, esto es para poder tomar varios argumentos por separado
     ya que si solo tomamos 1 a la hora de ejecutar comandos como info, remove o copy, no seran comandos validos*/
@@ -181,34 +179,22 @@ int ComprobarComando(char *strcomando, char *orden, char *argumento1, char *argu
     // Dividimos la entrada en orden y argumentos
     sscanf(strcomando, "%s %s %s", orden, argumento1, argumento2);
 
-    // Convertimos el comando principal a minúsculas para validarlo
+    // Convertimos el comando principal a minusculas para validarlo --> un poco extra
     for (int i = 0; orden[i]; i++) {
         orden[i] = tolower(orden[i]);
     }
 
     // Verificamos si el comando principal es valido
-    const char *comandos_validos[9] = {"dir", "rename", "copy", "remove", "info", "imprimir", "bytemaps", "exit", "help"};
-    for (int i = 0; i < 9; i++) {
+    const char *comandos_validos[10] = {"dir", "rename", "copy", "remove", "info", "imprimir", "bytemaps", "exit", "help", "debugger"};
+    for (int i = 0; i < 10; i++) {
         if (strcmp(orden, comandos_validos[i]) == 0) {
             return 0;
         }
     }
-    printf("ERROR, comando no valido\n");
+    printf("ERROR, comando no reconocido\n");
     return -1;
 }
 
-int CalcularBloquesAsignados(EXT_SIMPLE_INODE *inodo) {
-    int bloquesAsignados = 0;
-
-    for (int i = 0; i < MAX_NUMS_BLOQUE_INODO; i++) {
-        if (inodo->i_nbloque[i] == NULL_BLOQUE) {
-            break; // Fin de bloques asignados
-        }
-        bloquesAsignados++;
-    }
-
-    return bloquesAsignados;
-}
 
 
 void LeeSuperBloque(EXT_SIMPLE_SUPERBLOCK *psup){
@@ -230,7 +216,7 @@ int BuscaFich(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, char *nombre)
             return i;
         }
     }
-    printf("\nEl archivo %s no encontrado", nombre);
+    printf("\nArchivo %s no encontrado", nombre);
     return -1;
 }
 
@@ -267,7 +253,7 @@ void Directorio(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos) {
 int Renombrar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, char *nombreantiguo, char *nombrenuevo) {
     for (int i = 0; i < MAX_FICHEROS; i++) {
         if (directorio[i].dir_inodo != NULL_INODO && strcmp(directorio[i].dir_nfich, nombrenuevo) == 0) {
-            printf("ERROR: Ya existe un archivo con el nombre '%s'.\n", nombrenuevo);
+            printf("ERROR --> Ya existe un archivo con el nombre '%s'\n", nombrenuevo);
             return -1;
         }
     }
@@ -285,96 +271,104 @@ int Renombrar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, char *nombrea
 
 
 int Imprimir(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_DATOS *memdatos, char *nombre) {
-    // Buscar el archivo en el directorio
-    for (int i = 0; i < MAX_FICHEROS; i++) { // Editado aqui
-        if (strcmp(directorio[i].dir_nfich, nombre) == 0) {
-            int inodo_id = directorio[i].dir_inodo;
-            if (inodo_id != NULL_INODO) {
-                EXT_SIMPLE_INODE *inodo = &inodos->blq_inodos[inodo_id];
-
-                printf("Contenido del archivo '%s':\n", nombre); // Editado aqui
-
-                // Iterar por los bloques del inodo
-                for (int j = 0; j < MAX_NUMS_BLOQUE_INODO; j++) { // Editado aqui
-                    if (inodo->i_nbloque[j] == NULL_BLOQUE) break;
-
-                    // Imprimir datos del bloque
-                    for (int k = 0; k < SIZE_BLOQUE; k++) { // Editado aqui
-                        char c = memdatos[inodo->i_nbloque[j]].dato[k];
-                        printf("%c", c); // Editado aqui
-                    }
-                }
-
-                printf("\n"); // Editado aqui
-                return 0; // Editado aqui
-            }
-        }
-    }
-
-    printf("ERROR: Archivo '%s' no encontrado.\n", nombre); // Editado aqui
-    return -1; // Archivo no encontrado
-}
-
-
-
-int Borrar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_BYTE_MAPS *ext_bytemaps, 
-           EXT_SIMPLE_SUPERBLOCK *ext_superblock, char *nombre, FILE *fich) {
-    // Buscar el archivo a eliminar
-    int indexFichero = BuscaFich(directorio, inodos, nombre);
-    if (indexFichero == -1) {
-        printf("ERROR: El archivo '%s' no existe.\n", nombre);
+    // Usar la función BuscaFich para localizar el archivo
+    int idArchivo = BuscaFich(directorio, inodos, nombre);
+    if (idArchivo == -1) {
+        printf("ERROR --> Archivo '%s' no encontrado\n", nombre);
         return -1;
     }
 
-    // Obtener el numero de inodo del archivo
+    // Obtener el inodo correspondiente al archivo
+    unsigned short int inodo_id = directorio[idArchivo].dir_inodo;
+    EXT_SIMPLE_INODE *inodo = &inodos->blq_inodos[inodo_id];
+
+    printf("--> '%s':\n", nombre);
+
+    // Iterar por los bloques asignados al archivo
+    for (int j = 0; j < MAX_NUMS_BLOQUE_INODO; j++) {
+        if (inodo->i_nbloque[j] == NULL_BLOQUE) break;
+        // Imprimir el contenido del bloque directamente como una cadena
+        printf("%s", memdatos[inodo->i_nbloque[j]-4].dato);
+    }
+    printf("\n");
+    return 0;
+}
+
+
+int Borrar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_BYTE_MAPS *ext_bytemaps, EXT_SIMPLE_SUPERBLOCK *ext_superblock, char *nombre, EXT_DATOS *memdatos) {
+    // Buscar el archivo a eliminar
+    int indexFichero = BuscaFich(directorio, inodos, nombre);
+    if (indexFichero == -1) {
+        printf("ERROR --> El archivo '%s' no existe\n", nombre);
+        return -1;
+    }
+
+    // Obtenemos el numero de inodo del archivo
     unsigned short int inodoNum = directorio[indexFichero].dir_inodo;
     if (inodoNum >= MAX_INODOS) {
-        printf("ERROR: Inodo fuera de rango para el archivo '%s'.\n", nombre);
+        printf("ERROR --> Inodo fuera de rango --> '%s'\n", nombre);
         return -1;
     }
 
     // Referencia al inodo del archivo
     EXT_SIMPLE_INODE *inodo = &inodos->blq_inodos[inodoNum];
 
-    // Liberar los bloques ocupados por el archivo en el bytemap
+    // Liberamos los bloques ocupados por el archivo en el bytemap y limpiamos su contenido
     for (int i = 0; i < MAX_NUMS_BLOQUE_INODO; i++) {
         unsigned short int bloque = inodo->i_nbloque[i];
-        if (bloque == NULL_BLOQUE) break;
+        if (bloque == NULL_BLOQUE){
+            break;
+        }
 
-        ext_bytemaps->bmap_bloques[bloque] = 0; // Marcar bloque como libre
-        ext_superblock->s_free_blocks_count++; // Incrementar contador de bloques libres
+        // Ajustamos el indice del bloque a la estructura --> memdatos
+        unsigned short int bloqueMem = bloque - 4;
+
+        if (bloqueMem >= 0 && bloqueMem < MAX_BLOQUES_DATOS) {
+            // Limpiamos el contenido del bloque en memdatos
+            memset(memdatos[bloqueMem].dato, 0, SIZE_BLOQUE);
+
+            // Para depuraccion
+            //printf("Bloque %d limpiado\n", bloqueMem);
+        }
+
+        // Liberamos el bloque en el mapa de bits
+        ext_bytemaps->bmap_bloques[bloque] = 0; 
+        ext_superblock->s_free_blocks_count++; // Incrementamos contador de bloques libres
     }
 
-    // Limpiar el inodo (resetear valores)
+    // Limpiamos el inodo --> reset
     inodo->size_fichero = 0;
     for (int i = 0; i < MAX_NUMS_BLOQUE_INODO; i++) {
         inodo->i_nbloque[i] = NULL_BLOQUE;
     }
-    ext_bytemaps->bmap_inodos[inodoNum] = 0; // Marcar el inodo como libre
-    ext_superblock->s_free_inodes_count++; // Incrementar contador de inodos libres
+    ext_bytemaps->bmap_inodos[inodoNum] = 0; // Marcamos el inodo como libre
+    ext_superblock->s_free_inodes_count++; // Incrementamos contador de inodos libres
 
-    // Limpiar la entrada del directorio
+    // Limpiamos la entrada del directorio
     memset(directorio[indexFichero].dir_nfich, '\0', LEN_NFICH);
     directorio[indexFichero].dir_inodo = NULL_INODO;
 
-    printf("Archivo --> '%s' eliminado\n", nombre);
+    printf("--> '%s' eliminado\n", nombre);
     return 0;
 }
 
+
+
 int Copiar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_BYTE_MAPS *ext_bytemaps, EXT_SIMPLE_SUPERBLOCK *ext_superblock, EXT_DATOS *memdatos, char *nombreorigen, char *nombredestino, FILE *fich) {
-    // Buscar el archivo origen
+    // Buscamos el archivo origen con la funcion BuscaFich
     int origen = BuscaFich(directorio, inodos, nombreorigen);
     if (origen == -1) {
+        printf("ERROR --> Archivo '%s' no encontrado\n", nombreorigen);
         return -1;
     }
 
-    // Verificar si el archivo destino ya existe
+    // Verificamos si el archivo destino ya existe
     if (BuscaFich(directorio, inodos, nombredestino) != -1) {
-        printf("ERROR: El archivo destino '%s' ya existe\n", nombredestino);
+        printf("ERROR --> El archivo destino ya existe\n");
         return -1;
     }
 
-    // Encontrar el primer inodo libre
+    // Buscamos el primer inodo libre
     int inodoLibre = -1;
     for (int i = 0; i < MAX_INODOS; i++) {
         if (ext_bytemaps->bmap_inodos[i] == 0) { // Inodo libre
@@ -383,40 +377,40 @@ int Copiar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_BYTE_MAPS *e
         }
     }
     if (inodoLibre == -1) {
-        printf("ERROR: No hay inodos libres\n");
+        printf("ERROR --> No quedan inodos libres\n");
         return -1;
     }
 
-    // Encontrar la primera entrada libre en el directorio
+    // Encontramos la primera entrada libre en el directorio
     int entradaLibre = -1;
     for (int i = 0; i < MAX_FICHEROS; i++) {
-        if (directorio[i].dir_inodo == NULL_INODO) { // Entrada vacía
+        if (directorio[i].dir_inodo == NULL_INODO) { // Entrada vacia
             entradaLibre = i;
             break;
         }
     }
     if (entradaLibre == -1) {
-        printf("ERROR: No hay espacio en el directorio\n");
+        printf("ERROR --> No hay espacio en el directorio\n");
         return -1;
     }
 
-    // Referencias al inodo origen y al nuevo inodo
+    // Referenciamos al inodo origen y al nuevo inodo
     EXT_SIMPLE_INODE *inodoOrigen = &inodos->blq_inodos[directorio[origen].dir_inodo];
     EXT_SIMPLE_INODE *inodoNuevo = &inodos->blq_inodos[inodoLibre];
 
-    // Copiar tamaño del archivo y resetear el inodo nuevo
+    // Copiamos el tamaño del archivo y reseteamos el inodo nuevo
     inodoNuevo->size_fichero = inodoOrigen->size_fichero;
     for (int i = 0; i < MAX_NUMS_BLOQUE_INODO; i++) {
         inodoNuevo->i_nbloque[i] = NULL_BLOQUE;
     }
 
-    // Copiar datos del archivo origen a bloques libres
+    // Copiamos los datos del archivo origen a bloques libres
     int bloquesAsignados = 0;
     for (int i = 0; i < MAX_NUMS_BLOQUE_INODO; i++) {
         unsigned short int bloqueOrigen = inodoOrigen->i_nbloque[i];
         if (bloqueOrigen == NULL_BLOQUE) break;
 
-        // Buscar el primer bloque libre
+        // Buscamos el primer bloque libre
         int nuevoBloque = -1;
         for (int j = PRIM_BLOQUE_DATOS; j < MAX_BLOQUES_PARTICION; j++) {
             if (ext_bytemaps->bmap_bloques[j] == 0) { // Bloque libre
@@ -426,16 +420,16 @@ int Copiar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_BYTE_MAPS *e
             }
         }
         if (nuevoBloque == -1) {
-            printf("ERROR: No hay bloques libres.\n");
+            printf("ERROR --> No hay bloques libres\n");
             return -1;
         }
 
-        // Copiar datos del bloque origen al nuevo bloque
-        memcpy(memdatos[nuevoBloque].dato, memdatos[bloqueOrigen].dato, SIZE_BLOQUE);
+        // Copiamos datos del bloque origen al nuevo bloque
+        memcpy(memdatos[nuevoBloque - 4].dato, memdatos[bloqueOrigen - 4].dato, SIZE_BLOQUE);
         inodoNuevo->i_nbloque[bloquesAsignados++] = nuevoBloque;
     }
 
-    // Marcar el inodo nuevo como ocupado
+    // Ponemos el inodo nuevo como ocupado
     ext_bytemaps->bmap_inodos[inodoLibre] = 1;
 
     // Crear una nueva entrada en el directorio
@@ -447,9 +441,10 @@ int Copiar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_BYTE_MAPS *e
     ext_superblock->s_free_inodes_count--;
     ext_superblock->s_free_blocks_count -= bloquesAsignados;
 
-    printf("\nCopiando archivo --> '%s'\n", nombredestino);
+    printf("\nArchivo '%s' copiado como '%s'.\n", nombreorigen, nombredestino);
     return 0;
 }
+
 
 
 void Grabarinodosydirectorio(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, FILE *fich) {
@@ -460,27 +455,38 @@ void Grabarinodosydirectorio(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos
     // Escribir el directorio en el archivo
     fseek(fich, SIZE_BLOQUE * 3, SEEK_SET); // El bloque 3 contiene el directorio
     fwrite(directorio, sizeof(EXT_ENTRADA_DIR) * MAX_FICHEROS, 1, fich);
-
-    printf("Inodos y directorio grabados correctamente.\n");
+    // Depuraccion
+    //printf("Inodos y directorio grabados correctamente\n");
 }
 void GrabarByteMaps(EXT_BYTE_MAPS *ext_bytemaps, FILE *fich) {
     // Escribir los bytemaps en el bloque 1
     fseek(fich, SIZE_BLOQUE * 1, SEEK_SET); // El bloque 1 contiene los bytemaps
     fwrite(ext_bytemaps, sizeof(EXT_BYTE_MAPS), 1, fich);
-
-    printf("ByteMaps grabados correctamente.\n");
+    // Depuraccion
+    //printf("ByteMaps grabados correctamente.\n");
 }
 void GrabarSuperBloque(EXT_SIMPLE_SUPERBLOCK *ext_superblock, FILE *fich) {
     // Escribir el superbloque en el bloque 0
     fseek(fich, 0, SEEK_SET); // El bloque 0 contiene el superbloque
     fwrite(ext_superblock, sizeof(EXT_SIMPLE_SUPERBLOCK), 1, fich);
-
-    printf("SuperBloque grabado correctamente\n");
+    // Depuraccion
+    //printf("SuperBloque grabado correctamente\n");
 }
 void GrabarDatos(EXT_DATOS *memdatos, FILE *fich) {
     // Escribir los datos a partir del bloque 4
     fseek(fich, SIZE_BLOQUE * PRIM_BLOQUE_DATOS, SEEK_SET); // Los bloques de datos empiezan en el bloque 4
     fwrite(memdatos, sizeof(EXT_DATOS), MAX_BLOQUES_DATOS, fich);
+    // Depuraccion
+    //printf("Datos grabados correctamente\n");
+}
 
-    printf("Datos grabados correctamente\n");
+// Funcion para poder debuggear
+void printMemDatos(EXT_DATOS *memdatos) {
+  for (int i = 0; i < MAX_BLOQUES_DATOS; i++) {
+    printf("Bloque de datos %d\n", i);
+    for (int j = 0; j < SIZE_BLOQUE; j++) {
+      printf("%c", memdatos[i].dato[j]);
+    }
+    printf("\n");
+  }
 }
