@@ -285,33 +285,36 @@ int Renombrar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, char *nombrea
 
 
 int Imprimir(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_DATOS *memdatos, char *nombre) {
-    int nombreFichero = BuscaFich(directorio, inodos, nombre);
-    if (nombreFichero == -1) {
-        printf("ERROR: Archivo '%s' no encontrado.\n", nombre);
-        return -1;
+    // Buscar el archivo en el directorio
+    for (int i = 0; i < MAX_FICHEROS; i++) { // Editado aqui
+        if (strcmp(directorio[i].dir_nfich, nombre) == 0) {
+            int inodo_id = directorio[i].dir_inodo;
+            if (inodo_id != NULL_INODO) {
+                EXT_SIMPLE_INODE *inodo = &inodos->blq_inodos[inodo_id];
+
+                printf("Contenido del archivo '%s':\n", nombre); // Editado aqui
+
+                // Iterar por los bloques del inodo
+                for (int j = 0; j < MAX_NUMS_BLOQUE_INODO; j++) { // Editado aqui
+                    if (inodo->i_nbloque[j] == NULL_BLOQUE) break;
+
+                    // Imprimir datos del bloque
+                    for (int k = 0; k < SIZE_BLOQUE; k++) { // Editado aqui
+                        char c = memdatos[inodo->i_nbloque[j]].dato[k];
+                        printf("%c", c); // Editado aqui
+                    }
+                }
+
+                printf("\n"); // Editado aqui
+                return 0; // Editado aqui
+            }
+        }
     }
 
-    unsigned short int inodoNum = directorio[nombreFichero].dir_inodo;
-    if (inodoNum >= MAX_INODOS) {
-        printf("ERROR: Inodo fuera de rango para el archivo '%s'.\n", nombre);
-        return -1;
-    }
-
-    EXT_SIMPLE_INODE *inodo = &inodos->blq_inodos[inodoNum];
-    if (inodo->size_fichero == 0) {
-        printf("El archivo '%s' esta vacio.\n", nombre);
-        return 0;
-    }
-
-    printf("Contenido del archivo '%s':\n", nombre);
-    for (int i = 0; i < MAX_NUMS_BLOQUE_INODO; i++) {
-        unsigned short int bloque_num = inodo->i_nbloque[i];
-        if (bloque_num == NULL_BLOQUE) break;
-        fwrite(memdatos[bloque_num].dato, 1, SIZE_BLOQUE, stdout);
-    }
-    printf("\n");
-    return 0;
+    printf("ERROR: Archivo '%s' no encontrado.\n", nombre); // Editado aqui
+    return -1; // Archivo no encontrado
 }
+
 
 
 int Borrar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_BYTE_MAPS *ext_bytemaps, 
@@ -323,7 +326,7 @@ int Borrar(EXT_ENTRADA_DIR *directorio, EXT_BLQ_INODOS *inodos, EXT_BYTE_MAPS *e
         return -1;
     }
 
-    // Obtener el número de inodo del archivo
+    // Obtener el numero de inodo del archivo
     unsigned short int inodoNum = directorio[indexFichero].dir_inodo;
     if (inodoNum >= MAX_INODOS) {
         printf("ERROR: Inodo fuera de rango para el archivo '%s'.\n", nombre);
